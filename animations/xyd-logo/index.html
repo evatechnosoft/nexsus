@@ -1,0 +1,592 @@
+<title>XYD Logo Reveal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Lora:wght@400;500&family=Unbounded:wght@800&display=swap" rel="stylesheet">
+<style>
+    /* Layout: sidebar controls + 16:9 stage; stacks with stage on top on phones */
+    :root {
+        --anthropic-dark: #141413;
+        --anthropic-light: #faf9f5;
+        --anthropic-mid-gray: #b0aea5;
+        --anthropic-light-gray: #e8e6dc;
+        --anthropic-orange: #d97757;
+        --anthropic-blue: #6a9bcc;
+        --anthropic-green: #788c5d;
+        --stage: #05060d;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        font-family: 'Poppins', sans-serif;
+        background: linear-gradient(135deg, var(--anthropic-light) 0%, #f5f3ee 100%);
+        background-color: var(--anthropic-light);
+        min-height: 100vh;
+        color: var(--anthropic-dark);
+    }
+
+    .container { display: flex; min-height: 100vh; padding: 20px; gap: 20px; }
+
+    .sidebar {
+        width: 320px;
+        flex-shrink: 0;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(20, 20, 19, 0.1);
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .sidebar h1 { font-family: 'Lora', serif; font-size: 24px; font-weight: 500; margin-bottom: 8px; }
+    .sidebar .subtitle { color: var(--anthropic-mid-gray); font-size: 14px; margin-bottom: 32px; line-height: 1.4; }
+
+    .control-section { margin-bottom: 32px; }
+    .control-section h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .control-section h3::before { content: '•'; color: var(--anthropic-orange); font-weight: bold; }
+
+    .seed-input {
+        width: 100%;
+        background: var(--anthropic-light);
+        color: var(--anthropic-dark);
+        padding: 12px;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        margin-bottom: 12px;
+        border: 1px solid var(--anthropic-light-gray);
+        text-align: center;
+    }
+    .seed-input:focus { outline: none; border-color: var(--anthropic-orange); box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.1); background: white; }
+    .text-row { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
+    .text-row .seed-input { margin-bottom: 0; text-transform: uppercase; }
+
+    .seed-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+
+    .control-group { margin-bottom: 20px; }
+    .control-group label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 8px; }
+    .slider-container { display: flex; align-items: center; gap: 12px; }
+    .slider-container input[type="range"] { flex: 1; height: 4px; background: var(--anthropic-light-gray); border-radius: 2px; outline: none; -webkit-appearance: none; }
+    .slider-container input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: var(--anthropic-orange); border-radius: 50%; cursor: pointer; transition: all 0.2s ease; }
+    .slider-container input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.1); background: #c86641; }
+    .slider-container input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; background: var(--anthropic-orange); border-radius: 50%; border: none; cursor: pointer; }
+    .slider-container input:focus-visible { box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.35); }
+    .value-display { font-family: 'Courier New', monospace; font-size: 12px; color: var(--anthropic-mid-gray); min-width: 60px; text-align: right; }
+
+    .color-group { margin-bottom: 16px; }
+    .color-group label { display: block; font-size: 12px; color: var(--anthropic-mid-gray); margin-bottom: 4px; }
+    .color-picker-container { display: flex; align-items: center; gap: 8px; }
+    .color-picker-container input[type="color"] { width: 32px; height: 32px; border: none; border-radius: 6px; cursor: pointer; background: none; padding: 0; }
+    .color-value { font-family: 'Courier New', monospace; font-size: 12px; color: var(--anthropic-mid-gray); }
+
+    .button { background: var(--anthropic-orange); color: white; border: none; padding: 10px 16px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; width: 100%; font-family: inherit; }
+    .button:hover { background: #c86641; transform: translateY(-1px); }
+    .button:active { transform: translateY(0); }
+    .button:focus-visible { outline: 2px solid var(--anthropic-dark); outline-offset: 2px; }
+    .button.secondary { background: var(--anthropic-blue); }
+    .button.secondary:hover { background: #5a8bb8; }
+    .button.tertiary { background: var(--anthropic-green); }
+    .button.tertiary:hover { background: #6b7b52; }
+    .button-row { display: flex; gap: 8px; }
+    .button-row .button { flex: 1; }
+
+    .canvas-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-width: 0; }
+    #canvas-container { width: 100%; max-width: 1100px; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 40px rgba(20, 20, 19, 0.15); background: var(--stage); aspect-ratio: 16 / 9; }
+    #canvas-container canvas { display: block; width: 100% !important; height: auto !important; }
+    .timeline { width: 100%; max-width: 1100px; display: flex; gap: 4px; font-size: 12px; color: var(--anthropic-mid-gray); }
+    .timeline span { flex: 1; text-align: center; padding: 6px 4px; border-top: 2px solid var(--anthropic-light-gray); transition: color .2s, border-color .2s; }
+    .timeline span.on { color: var(--anthropic-dark); border-color: var(--anthropic-orange); }
+
+    .loading { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 16px; color: var(--anthropic-mid-gray); }
+
+    @media (max-width: 600px) {
+        .container { flex-direction: column; padding: 16px; }
+        .sidebar { width: 100%; }
+        .canvas-area { order: -1; }
+        .timeline { font-size: 10px; }
+    }
+</style>
+
+<div class="container">
+    <div class="sidebar">
+        <h1>XYD Logo Reveal</h1>
+        <div class="subtitle">Işık parçacıkları sahneye akar, "O" harfini oluşturur, parçalanır ve XYD'ye dönüşür.</div>
+
+        <div class="control-section">
+            <h3>Seed</h3>
+            <input type="number" id="seed-input" class="seed-input" value="12345" onchange="updateSeed()">
+            <div class="seed-controls">
+                <button class="button secondary" onclick="previousSeed()">← Önceki</button>
+                <button class="button secondary" onclick="nextSeed()">Sonraki →</button>
+            </div>
+            <button class="button tertiary" onclick="randomSeedAndUpdate()">↻ Rastgele</button>
+        </div>
+
+        <div class="control-section">
+            <h3>Yazı</h3>
+            <div class="text-row">
+                <input type="text" id="startLetter" class="seed-input" value="O" maxlength="2" aria-label="Başlangıç harfi" onchange="updateText()">
+                <input type="text" id="word" class="seed-input" value="XYD" maxlength="8" aria-label="Hedef yazı" onchange="updateText()">
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>Parametreler</h3>
+            <div class="control-group">
+                <label for="speed">Hız</label>
+                <div class="slider-container">
+                    <input type="range" id="speed" min="0.4" max="2" step="0.1" value="1" oninput="updateParam('speed', this.value)">
+                    <span class="value-display" id="speed-value">1</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="density">Nokta aralığı (px)</label>
+                <div class="slider-container">
+                    <input type="range" id="density" min="3" max="9" step="1" value="5" oninput="updateParam('density', this.value)">
+                    <span class="value-display" id="density-value">5</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="burst">Parçalanma gücü</label>
+                <div class="slider-container">
+                    <input type="range" id="burst" min="0" max="2.5" step="0.1" value="1" oninput="updateParam('burst', this.value)">
+                    <span class="value-display" id="burst-value">1</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="glow">Işıma</label>
+                <div class="slider-container">
+                    <input type="range" id="glow" min="0.4" max="2" step="0.1" value="1" oninput="updateParam('glow', this.value)">
+                    <span class="value-display" id="glow-value">1</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <label for="trail">Işık izi</label>
+                <div class="slider-container">
+                    <input type="range" id="trail" min="0.5" max="0.95" step="0.01" value="0.82" oninput="updateParam('trail', this.value)">
+                    <span class="value-display" id="trail-value">0.82</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>Renkler</h3>
+            <div class="color-group">
+                <label for="color1">Işık 1 (sol)</label>
+                <div class="color-picker-container">
+                    <input type="color" id="color1" value="#5cc8ff" onchange="updateColor('color1', this.value)">
+                    <span class="color-value" id="color1-value">#5cc8ff</span>
+                </div>
+            </div>
+            <div class="color-group">
+                <label for="color2">Işık 2 (sağ)</label>
+                <div class="color-picker-container">
+                    <input type="color" id="color2" value="#ffb35c" onchange="updateColor('color2', this.value)">
+                    <span class="color-value" id="color2-value">#ffb35c</span>
+                </div>
+            </div>
+            <div class="color-group">
+                <label for="color3">Sahne arka planı</label>
+                <div class="color-picker-container">
+                    <input type="color" id="color3" value="#05060d" onchange="updateColor('color3', this.value)">
+                    <span class="color-value" id="color3-value">#05060d</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3>İşlemler</h3>
+            <div class="button-row">
+                <button class="button" onclick="restart()">▶ Baştan oynat</button>
+                <button class="button secondary" onclick="resetParameters()">Sıfırla</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="canvas-area">
+        <div id="canvas-container">
+            <div class="loading">Parçacıklar hazırlanıyor…</div>
+        </div>
+        <div class="timeline" id="timeline">
+            <span>Giriş</span><span>O</span><span>Parçalanma</span><span>XYD</span><span>Çözülme</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ═══════════════════════════════════════════════════════════════════════
+    // PARAMETERS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    let params = {
+        seed: 12345,
+        startLetter: 'O',
+        word: 'XYD',
+        speed: 1,
+        density: 5,
+        burst: 1,
+        glow: 1,
+        trail: 0.82,
+        colorPalette: ['#5cc8ff', '#ffb35c', '#05060d']
+    };
+    let defaultParams = { ...params, colorPalette: [...params.colorPalette] };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // TIMELINE (seconds at speed 1)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const W = 1280, H = 720, CX = W / 2, CY = H / 2;
+    const T = {
+        enterTravel: 1.3,
+        oFormed: 2.2,
+        oSweep: [2.45, 3.35],
+        morphStart: 3.6,
+        morphTravel: 1.2,
+        textFormed: 5.4,
+        tSweep: [5.9, 7.2],
+        dissolveStart: 8.4,
+        dissolveEnd: 9.4,
+        loop: 9.9
+    };
+    const FONT = (s) => `800 ${s}px Unbounded, "Arial Black", Impact, sans-serif`;
+
+    let parts = [];
+    let sprites = [];
+    let ctx, startMs = 0, phaseIdx = -1, trailEff = 0.82;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function setup() {
+        pixelDensity(1);
+        const canvas = createCanvas(W, H);
+        canvas.parent('canvas-container');
+        ctx = drawingContext;
+        document.querySelector('.loading').style.display = 'none';
+        clearStage();
+        const fontReady = document.fonts ? document.fonts.load(FONT(300)).catch(() => {}) : Promise.resolve();
+        Promise.race([fontReady, new Promise(r => setTimeout(r, 2500))]).then(initializeSystem);
+    }
+
+    // Rasterise a string offscreen and return a jittered grid of ink points.
+    function samplePoints(str, size, step) {
+        const g = document.createElement('canvas');
+        g.width = W; g.height = H;
+        const c = g.getContext('2d', { willReadFrequently: true });
+        let s = size;
+        c.font = FONT(s);
+        const maxW = W * 0.8;
+        const w = c.measureText(str).width;
+        if (w > maxW) { s *= maxW / w; c.font = FONT(s); }
+        const m = c.measureText(str);
+        const asc = m.actualBoundingBoxAscent || s * 0.72;
+        const desc = m.actualBoundingBoxDescent || 0;
+        c.fillStyle = '#fff';
+        c.textAlign = 'center';
+        c.textBaseline = 'alphabetic';
+        c.fillText(str, CX, CY + (asc - desc) / 2);
+        const d = c.getImageData(0, 0, W, H).data;
+        const pts = [];
+        const j = step * 0.35;
+        for (let y = 0; y < H; y += step) {
+            for (let x = 0; x < W; x += step) {
+                if (d[(y * W + x) * 4 + 3] > 128) pts.push({ x: x + random(-j, j), y: y + random(-j, j) });
+            }
+        }
+        return pts;
+    }
+
+    function initializeSystem() {
+        randomSeed(params.seed);
+        noiseSeed(params.seed);
+
+        const step = params.density;
+        const O = samplePoints(params.startLetter || 'O', 400, step);
+        const Tp = samplePoints(params.word || 'XYD', 300, step);
+        if (!O.length || !Tp.length) return;
+
+        // Sorting both clouds by x makes the shatter directional:
+        // the left edge of the O flows to the first letter, the right edge to the last.
+        O.sort((a, b) => a.x - b.x);
+        Tp.sort((a, b) => a.x - b.x);
+        const N = Math.max(O.length, Tp.length);
+        const minX = Tp[0].x, maxX = Tp[Tp.length - 1].x;
+
+        parts = [];
+        for (let i = 0; i < N; i++) {
+            const o = O[Math.floor(i * O.length / N)];
+            const t = Tp[Math.floor(i * Tp.length / N)];
+            const a = random(TWO_PI), r = random(780, 1050);
+            const sx = CX + Math.cos(a) * r, sy = CY + Math.sin(a) * r * 0.75;
+            const dx = o.x - sx, dy = o.y - sy, len = Math.hypot(dx, dy) || 1;
+            const u = (t.x - minX) / Math.max(1, maxX - minX);
+            parts.push({
+                sx, sy, ox: o.x, oy: o.y, tx: t.x, ty: t.y,
+                px: -dy / len, py: dx / len,
+                swirl: random(-1, 1) * random(60, 240),
+                dEnter: Math.pow(random(), 1.4) * 0.9,
+                dMorph: u * 0.5 + random(0, 0.15),
+                burstR: random(0.35, 1.2),
+                col: random() < 1 - u ? 0 : 1,
+                ph: random(TWO_PI),
+                nx: random(1000),
+                size: random(0.7, 1.3)
+            });
+        }
+        buildSprites();
+        restart();
+    }
+
+    function hexToRgb(hex) {
+        const n = parseInt(hex.slice(1), 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    function rgba(hex, a) { const [r, g, b] = hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; }
+
+    // Pre-rendered glow sprites: white-hot core fading into the light colour.
+    function buildSprites() {
+        sprites = [0, 1].map(i => {
+            const c = document.createElement('canvas');
+            c.width = c.height = 64;
+            const g = c.getContext('2d');
+            const col = params.colorPalette[i];
+            const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gr.addColorStop(0, 'rgba(255,255,255,1)');
+            gr.addColorStop(0.1, 'rgba(255,255,255,0.9)');
+            gr.addColorStop(0.2, rgba(col, 0.8));
+            gr.addColorStop(0.45, rgba(col, 0.18));
+            gr.addColorStop(1, rgba(col, 0));
+            g.fillStyle = gr;
+            g.fillRect(0, 0, 64, 64);
+            return c;
+        });
+    }
+
+    const easeOutCubic = k => 1 - Math.pow(1 - k, 3);
+    const easeInOutCubic = k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    const easeInOutSine = k => -(Math.cos(Math.PI * k) - 1) / 2;
+    const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+
+    // Diagonal light band that lights up particles as it passes.
+    function sweep(x, y, t, win) {
+        if (t < win[0] || t > win[1]) return 0;
+        const u = (t - win[0]) / (win[1] - win[0]);
+        const pos = -350 + (W + 700) * easeInOutSine(u);
+        const d = x + (y - CY) * 0.55 - pos;
+        return 1.5 * Math.exp(-(d * d) / (2 * 50 * 50));
+    }
+
+    // Particle state is a pure function of time, so every seed replays identically.
+    function state(p, t) {
+        let x, y, b, a = 1;
+        if (t < T.morphStart) {
+            const k = clamp01((t - p.dEnter) / T.enterTravel);
+            if (k <= 0) return null;
+            const e = easeOutCubic(k);
+            const s = Math.sin(Math.PI * e) * p.swirl;
+            x = p.sx + (p.ox - p.sx) * e + p.px * s;
+            y = p.sy + (p.oy - p.sy) * e + p.py * s;
+            b = 0.45 + (1 - e) * 0.9;
+            if (k >= 1) { x += Math.sin(t * 5 + p.ph) * 0.6; y += Math.cos(t * 4 + p.ph) * 0.6; }
+            b += sweep(x, y, t, T.oSweep);
+        } else if (t < T.dissolveStart) {
+            const k = clamp01((t - T.morphStart - p.dMorph) / T.morphTravel);
+            const e = easeInOutCubic(k);
+            const ox = p.ox - CX, oy = p.oy - CY, ol = Math.hypot(ox, oy) || 1;
+            const arc = Math.sin(Math.PI * e);
+            const bs = arc * params.burst * p.burstR * 190;
+            const nz = (noise(p.nx, t * 0.9) - 0.5) * arc * 160;
+            x = p.ox + (p.tx - p.ox) * e + ox / ol * bs + p.px * nz;
+            y = p.oy + (p.ty - p.oy) * e + oy / ol * bs + p.py * nz;
+            b = 0.5 + arc * 0.9;
+            if (k >= 1) { x += Math.sin(t * 5 + p.ph) * 0.5; y += Math.cos(t * 4 + p.ph) * 0.5; }
+            b += sweep(x, y, t, T.tSweep);
+        } else {
+            const k = clamp01((t - T.dissolveStart) / (T.dissolveEnd - T.dissolveStart));
+            const e = k * k;
+            const ang = noise(p.nx, 0.5) * TWO_PI * 2;
+            x = p.tx + Math.cos(ang) * e * 150;
+            y = p.ty + Math.sin(ang) * e * 150 - e * 90;
+            a = 1 - k;
+            b = 0.5 + k * 0.5;
+        }
+        return { x, y, b, a };
+    }
+
+    function radial(x, y, r, col, alpha, sx = 1, sy = 1) {
+        if (alpha <= 0.002) return;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(sx, sy);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+        g.addColorStop(0, rgba(col, alpha));
+        g.addColorStop(0.35, rgba(col, alpha * 0.35));
+        g.addColorStop(1, rgba(col, 0));
+        ctx.fillStyle = g;
+        ctx.fillRect(-r, -r, r * 2, r * 2);
+        ctx.restore();
+    }
+
+    // Flash + anamorphic streak at a given moment.
+    function flashAt(t, t0, strength, col) {
+        const dt = t - t0;
+        if (dt < 0 || dt > 1.2) return;
+        const f = Math.exp(-dt * 4.5) * strength;
+        radial(CX, CY, 420, '#ffffff', 0.22 * f);
+        radial(CX, CY, 260, col, 0.9 * f, 5, 0.035);
+        radial(CX, CY, 180, '#ffffff', 0.6 * f, 3.2, 0.02);
+    }
+
+    function ambient(t) {
+        let k = clamp01((t - 1.6) / 1.0);
+        if (t > T.dissolveStart) k *= 1 - clamp01((t - T.dissolveStart) / (T.dissolveEnd - T.dissolveStart));
+        if (k <= 0) return;
+        // Trails accumulate additively, so keep the per-frame contribution small.
+        const a = 0.014 * k * (1 - trailEff) * 5.5;
+        radial(CX - 220, CY, 520, params.colorPalette[0], a, 1, 0.7);
+        radial(CX + 220, CY, 520, params.colorPalette[1], a, 1, 0.7);
+    }
+
+    function clearStage() {
+        if (!ctx) return;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = params.colorPalette[2];
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    function restart() {
+        startMs = millis();
+        clearStage();
+    }
+
+    function updateTimeline(t) {
+        const i = t < T.oFormed ? 0 : t < T.morphStart ? 1 : t < T.textFormed ? 2 : t < T.dissolveStart ? 3 : 4;
+        if (i === phaseIdx) return;
+        phaseIdx = i;
+        document.querySelectorAll('#timeline span').forEach((el, j) => el.classList.toggle('on', j === i));
+    }
+
+    function draw() {
+        if (!parts.length) return;
+        let t = (millis() - startMs) / 1000 * params.speed;
+        if (reduceMotion) t = (T.textFormed + T.dissolveStart) / 2; // show the finished logo, no motion
+        if (t > T.loop) { restart(); t = 0; }
+        updateTimeline(t);
+
+        // Once a shape has settled, shorten the trail so 8-bit fade residue clears out.
+        const settled = (t > T.oFormed + 0.4 && t < T.morphStart) || (t > T.textFormed + 0.5 && t < T.dissolveStart);
+        trailEff = settled ? Math.min(params.trail, 0.6) : params.trail;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = reduceMotion ? 1 : 1 - trailEff;
+        ctx.fillStyle = params.colorPalette[2];
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 1;
+        ambient(t);
+
+        const base = 16 * params.glow;
+        const alphaK = 0.32 * Math.min(1.4, params.glow);
+        for (let i = 0; i < parts.length; i++) {
+            const p = parts[i];
+            const s = state(p, t);
+            if (!s) continue;
+            const al = s.b * alphaK * s.a;
+            if (al <= 0.003) continue;
+            ctx.globalAlpha = al > 1 ? 1 : al;
+            const z = base * p.size * (0.75 + s.b * 0.35);
+            ctx.drawImage(sprites[p.col], s.x - z / 2, s.y - z / 2, z, z);
+        }
+
+        ctx.globalAlpha = 1;
+        flashAt(t, T.oFormed - 0.1, 0.5, params.colorPalette[0]);
+        flashAt(t, T.morphStart, 1.0, params.colorPalette[1]);
+        flashAt(t, T.textFormed - 0.1, 0.7, params.colorPalette[0]);
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // UI CONTROL HANDLERS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function updateParam(paramName, value) {
+        params[paramName] = parseFloat(value);
+        document.getElementById(paramName + '-value').textContent = value;
+        if (paramName === 'density') initializeSystem();
+    }
+
+    function updateColor(colorId, value) {
+        const idx = { color1: 0, color2: 1, color3: 2 }[colorId];
+        params.colorPalette[idx] = value;
+        document.getElementById(colorId + '-value').textContent = value;
+        document.documentElement.style.setProperty('--stage', params.colorPalette[2]);
+        buildSprites();
+        if (idx === 2) clearStage();
+    }
+
+    function updateText() {
+        const s = document.getElementById('startLetter');
+        const w = document.getElementById('word');
+        params.startLetter = (s.value.trim() || 'O').toUpperCase();
+        params.word = (w.value.trim() || 'XYD').toUpperCase();
+        s.value = params.startLetter;
+        w.value = params.word;
+        initializeSystem();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SEED CONTROL FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function updateSeedDisplay() {
+        document.getElementById('seed-input').value = params.seed;
+    }
+
+    function updateSeed() {
+        const newSeed = parseInt(document.getElementById('seed-input').value);
+        if (newSeed && newSeed > 0) {
+            params.seed = newSeed;
+            initializeSystem();
+        } else {
+            updateSeedDisplay();
+        }
+    }
+
+    function previousSeed() {
+        params.seed = Math.max(1, params.seed - 1);
+        updateSeedDisplay();
+        initializeSystem();
+    }
+
+    function nextSeed() {
+        params.seed = params.seed + 1;
+        updateSeedDisplay();
+        initializeSystem();
+    }
+
+    function randomSeedAndUpdate() {
+        params.seed = Math.floor(Math.random() * 999999) + 1;
+        updateSeedDisplay();
+        initializeSystem();
+    }
+
+    function resetParameters() {
+        params = { ...defaultParams, colorPalette: [...defaultParams.colorPalette] };
+        ['speed', 'density', 'burst', 'glow', 'trail'].forEach(k => {
+            document.getElementById(k).value = params[k];
+            document.getElementById(k + '-value').textContent = params[k];
+        });
+        ['color1', 'color2', 'color3'].forEach((id, i) => {
+            document.getElementById(id).value = params.colorPalette[i];
+            document.getElementById(id + '-value').textContent = params.colorPalette[i];
+        });
+        document.getElementById('startLetter').value = params.startLetter;
+        document.getElementById('word').value = params.word;
+        document.documentElement.style.setProperty('--stage', params.colorPalette[2]);
+        updateSeedDisplay();
+        initializeSystem();
+    }
+
+    window.addEventListener('load', updateSeedDisplay);
+</script>
